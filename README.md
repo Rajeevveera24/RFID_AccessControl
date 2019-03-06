@@ -16,3 +16,7 @@ The LCD screen I worked with isn't working at present, so details are being disp
 
 The current implementation has a few drawbacks, and the current focus is to device a better mecahnism to delete an already existing card.
 I plan to incorporate a node MCU, along with the nano to make the process more efficient.
+
+Disclaimer: I have referred to the following link for this project (https://electronicshobbyists.com/rfid-based-access-control-system-using-arduino/)
+
+While the idea is similar, the code is original
