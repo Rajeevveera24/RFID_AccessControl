@@ -412,4 +412,3 @@ uint8_t getID() {
   mfrc522.PICC_HaltA(); // Stop reading from RFID reader
   return 1;  
 }
-
