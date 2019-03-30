@@ -29,6 +29,8 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);  // Create MFRC522 instance
 File dataFile;
 
 
+#define nodeButton 4
+
 // Set Pins for led's, servo, buzzer and wipe button
 /*constexpr uint8_t greenLed = 6;
 constexpr uint8_t blueLed = 5;
@@ -50,23 +52,23 @@ int currentClub;    //Represents the club a scanned card belongs to...
 
 //Declaring structure for storing the card IDs of masters and clubs
 
-#define num_member 100 //This is the maximum number of members a student project/club can have
-#define num_club 11    // This Represents the total number of clubs/student project
+#define numMember 100 //This is the maximum number of members a student project/club can have
+#define numClub 11    // This Represents the total number of clubs/student project
 
 struct masterData{
-  byte master_uid[4];   //UID of a master
-  String club_name;   //Club name which master belongs to
-  String club_file;   //This is the name of the .dat file which will be stored in the SD card and from which data will be retrieved
+  byte masterUID[4];   //UID of a master
+  String clubName;   //Club name which master belongs to
+  String clubFile;   //This is the name of the .dat file which will be stored in the SD card and from which data will be retrieved
 };
 
-masterData md[num_club];
+masterData md[numClub];
 
-struct club_data{
-  int card_count;
-  byte card_id[num_member][4];
+struct clubData{
+  int cardCount;
+  byte cardID[numMember][4];
 };
 
-club_data cb;     //creating an object of type club_data
+clubData cb;     //creating an object of type clubData
                   //This object stores the details of number of people, and the UIDs of these people from a particular student project
                   //In our actual implementation, this object will read from the SD card
 
@@ -76,6 +78,7 @@ club_data cb;     //creating an object of type club_data
 void setup() {
   Serial.begin(9600);     
   while (!Serial);    //Don't procede if serial connection is not set up
+  pinMode(nodeButton,INPUT);
   SPI.begin();     
   SD.begin();
   mfrc522.PCD_Init();   
@@ -89,43 +92,48 @@ void setup() {
 //Entering Loop()...
 
 void loop(){
-  
-  do{
-    successRead = getID();  
-  }while(!successRead);       //Keep reading from the RFID reader until a card is detected and it's UID is stored in readCard[] (by the function getID())
-  
-  if(masterMode){
-    if(isMasterCard()){       //If we are presently in master mode and the master card is scanned again, we exit master mode and shift to normal mode...
-      Serial.println("Exiting Program Mode");
-      masterMode = false;
-      delay(1000);
-      Serial.println("Normal Mode - Scan a tag");   //Once in normal mode, we simply scan a tag(card) to see if it has access or not...
-    }
-    else{
-      if(isPresentMaster()){
-        deleteCard();       //If the card is present in database of the club, it is deleted by calling the function deleteCard()
-      }                     // The function also sets masterMode to false, thus exiting out of master mode. Therefore, after deleting a card, we return to normal mode
-      else{
-        addCard();          //If the card is not present in database of the club, it is added by calling the function addCard()
-      }                     // The function also sets masterMode to false, thus exiting out of masted mode
-    }
+
+  if(nodeButton == HIGH){
+    nodeOn();
   }
-  else{                   // If this block is executed, then we are presently NOT in master mode
-    if(isMasterCard()){   // If we are in normal mode and the master card is scanned, we enter master mode
-      masterMode = true;
-      Serial.println("Entering Master Mode for " +md[currentMaster].club_name);
-      Serial.println("Scan a card to add/delete");
-    }
-    else{                 //We are not in master mode and a non master card has been scanned. Thus, it can either be granted access or not
-      if(isPresentNormal()){  //If the card is present in the club's database, print access granted along with the club's name
-        Serial.println("Access Granted for" + md[currentClub].club_name);
-        delay(2000);        // After access is granted, we go back to normal mode
-        Serial.println("Normal Mode - Scan a tag");
+  else{
+    do{
+      successRead = getID();  
+    }while(!successRead);       //Keep reading from the RFID reader until a card is detected and it's UID is stored in readCard[] (by the function getID())
+    
+    if(masterMode){
+      if(isMasterCard()){       //If we are presently in master mode and the master card is scanned again, we exit master mode and shift to normal mode...
+        Serial.println("Exiting Program Mode");
+        masterMode = false;
+        delay(1000);
+        Serial.println("Normal Mode - Scan a tag");   //Once in normal mode, we simply scan a tag(card) to see if it has access or not...
       }
-      else{                 //If the card is NOT present in the club's database, print access denied along with the club's name
-        Serial.println("Access Denied");
-        delay(1000);        // After access is denied, we go back to normal mode
-        Serial.println("Normal Mode - Scan a tag");
+      else{
+        if(isPresentMaster()){
+          deleteCard();       //If the card is present in database of the club, it is deleted by calling the function deleteCard()
+        }                     // The function also sets masterMode to false, thus exiting out of master mode. Therefore, after deleting a card, we return to normal mode
+        else{
+          addCard();          //If the card is not present in database of the club, it is added by calling the function addCard()
+        }                     // The function also sets masterMode to false, thus exiting out of masted mode
+      }
+    }
+    else{                   // If this block is executed, then we are presently NOT in master mode
+      if(isMasterCard()){   // If we are in normal mode and the master card is scanned, we enter master mode
+        masterMode = true;
+        Serial.println("Entering Master Mode for " +md[currentMaster].clubName);
+        Serial.println("Scan a card to add/delete");
+      }
+      else{                 //We are not in master mode and a non master card has been scanned. Thus, it can either be granted access or not
+        if(isPresentNormal()){  //If the card is present in the club's database, print access granted along with the club's name
+          Serial.println("Access Granted for" + md[currentClub].clubName);
+          delay(2000);        // After access is granted, we go back to normal mode
+          Serial.println("Normal Mode - Scan a tag");
+        }
+        else{                 //If the card is NOT present in the club's database, print access denied along with the club's name
+          Serial.println("Access Denied");
+          delay(1000);        // After access is denied, we go back to normal mode
+          Serial.println("Normal Mode - Scan a tag");
+        }
       }
     }
   }
@@ -138,111 +146,111 @@ void loop(){
 
 void initial_setup(){ //This function is called in set up 
   //RnC
-  md[0].club_name = "RnC";
-  md[0].club_file = "RNC.dat";
-  md[0].master_uid[0] = 0;  //Mohit's UID needs to be stored here...
-  md[0].master_uid[1] = 0;
-  md[0].master_uid[2] = 0;
-  md[0].master_uid[3] = 0;
+  md[0].clubName = "RnC";
+  md[0].clubFile = "RNC.dat";
+  md[0].masterUID[0] = 0;  //Mohit's UID needs to be stored here...
+  md[0].masterUID[1] = 0;
+  md[0].masterUID[2] = 0;
+  md[0].masterUID[3] = 0;
 
-  md[1].club_name = "Rugved";
-  md[1].club_file = "RUGVED.dat";
-  md[1].master_uid[0] = 0;  //Rugved head's UID needs to be stored here...
-  md[1].master_uid[1] = 0;
-  md[1].master_uid[2] = 0;
-  md[1].master_uid[3] = 0;
+  md[1].clubName = "Rugved";
+  md[1].clubFile = "RUGVED.dat";
+  md[1].masterUID[0] = 0;  //Rugved head's UID needs to be stored here...
+  md[1].masterUID[1] = 0;
+  md[1].masterUID[2] = 0;
+  md[1].masterUID[3] = 0;
 
   //ThrustMIT
-  md[2].club_name = "ThrustMIT";
-  md[2].club_file = "THRUSTMIT.dat";
-  md[2].master_uid[0] = 0;  //head's UID needs to be stored here...
-  md[2].master_uid[1] = 0;
-  md[2].master_uid[2] = 0;
-  md[2].master_uid[3] = 0;
+  md[2].clubName = "ThrustMIT";
+  md[2].clubFile = "THRUSTMIT.dat";
+  md[2].masterUID[0] = 0;  //head's UID needs to be stored here...
+  md[2].masterUID[1] = 0;
+  md[2].masterUID[2] = 0;
+  md[2].masterUID[3] = 0;
 
   //AeroMIT
-  md[3].club_name = "AeroMIT";
-  md[3].club_file = "AEROMIT.dat";
-  md[3].master_uid[0] = 0;  //head's UID needs to be stored here...
-  md[3].master_uid[1] = 0;
-  md[3].master_uid[2] = 0;
-  md[3].master_uid[3] = 0;
+  md[3].clubName = "AeroMIT";
+  md[3].clubFile = "AEROMIT.dat";
+  md[3].masterUID[0] = 0;  //head's UID needs to be stored here...
+  md[3].masterUID[1] = 0;
+  md[3].masterUID[2] = 0;
+  md[3].masterUID[3] = 0;
 
   //SAE
-  md[4].club_name = "SAE";
-  md[4].club_file = "SAE.dat";
-  md[4].master_uid[0] = 0;  //head's UID needs to be stored here...
-  md[4].master_uid[1] = 0;
-  md[4].master_uid[2] = 0;
-  md[4].master_uid[3] = 0;
+  md[4].clubName = "SAE";
+  md[4].clubFile = "SAE.dat";
+  md[4].masterUID[0] = 0;  //head's UID needs to be stored here...
+  md[4].masterUID[1] = 0;
+  md[4].masterUID[2] = 0;
+  md[4].masterUID[3] = 0;
 
   //MRM
-  md[5].club_name = "MRM";
-  md[5].club_file = "MRM.dat";
-  md[5].master_uid[0] = 0;  //head's UID needs to be stored here...
-  md[5].master_uid[1] = 0;
-  md[5].master_uid[2] = 0;
-  md[5].master_uid[3] = 0;
+  md[5].clubName = "MRM";
+  md[5].clubFile = "MRM.dat";
+  md[5].masterUID[0] = 0;  //head's UID needs to be stored here...
+  md[5].masterUID[1] = 0;
+  md[5].masterUID[2] = 0;
+  md[5].masterUID[3] = 0;
 
   //Manas
-  md[6].club_name = "Manas";
-  md[6].club_file = "MANAS.dat";
-  md[6].master_uid[0] = 0;  //head's UID needs to be stored here...
-  md[6].master_uid[1] = 0;
-  md[6].master_uid[2] = 0;
-  md[6].master_uid[3] = 0;
+  md[6].clubName = "Manas";
+  md[6].clubFile = "MANAS.dat";
+  md[6].masterUID[0] = 0;  //head's UID needs to be stored here...
+  md[6].masterUID[1] = 0;
+  md[6].masterUID[2] = 0;
+  md[6].masterUID[3] = 0;
 
   //TMR
-  md[7].club_name = "TMR";
-  md[7].club_file = "TMR.dat";
-  md[7].master_uid[0] = 0;  //head's UID needs to be stored here...
-  md[7].master_uid[1] = 0;
-  md[7].master_uid[2] = 0;
-  md[7].master_uid[3] = 0;  
+  md[7].clubName = "TMR";
+  md[7].clubFile = "TMR.dat";
+  md[7].masterUID[0] = 0;  //head's UID needs to be stored here...
+  md[7].masterUID[1] = 0;
+  md[7].masterUID[2] = 0;
+  md[7].masterUID[3] = 0;  
 
   //FM
-  md[8].club_name = "FM";
-  md[8].club_file = "FM.dat";
-  md[8].master_uid[0] = 0;  //head's UID needs to be stored here...
-  md[8].master_uid[1] = 0;
-  md[8].master_uid[2] = 0;
-  md[8].master_uid[3] = 0;
+  md[8].clubName = "FM";
+  md[8].clubFile = "FM.dat";
+  md[8].masterUID[0] = 0;  //head's UID needs to be stored here...
+  md[8].masterUID[1] = 0;
+  md[8].masterUID[2] = 0;
+  md[8].masterUID[3] = 0;
   
   //SM
-  md[9].club_name = "Solar Mobile";
-  md[9].club_file = "SM.dat";
-  md[9].master_uid[0] = 0;  //head's UID needs to be stored here...
-  md[9].master_uid[1] = 0;
-  md[9].master_uid[2] = 0;
-  md[9].master_uid[3] = 0;
+  md[9].clubName = "Solar Mobile";
+  md[9].clubFile = "SM.dat";
+  md[9].masterUID[0] = 0;  //head's UID needs to be stored here...
+  md[9].masterUID[1] = 0;
+  md[9].masterUID[2] = 0;
+  md[9].masterUID[3] = 0;
 
   //RM
-  md[10].club_name = "Robo Manipal";
-  md[10].club_file = "RM.dat";
-  md[10].master_uid[0] = 0;  //head's UID needs to be stored here...
-  md[10].master_uid[1] = 0;
-  md[10].master_uid[2] = 0;
-  md[10].master_uid[3] = 0;  
+  md[10].clubName = "Robo Manipal";
+  md[10].clubFile = "RM.dat";
+  md[10].masterUID[0] = 0;  //head's UID needs to be stored here...
+  md[10].masterUID[1] = 0;
+  md[10].masterUID[2] = 0;
+  md[10].masterUID[3] = 0;  
 }
 
 
 void write_to_card(){
-  dataFile = SD.open(md[currentMaster].club_name,FILE_WRITE);
+  dataFile = SD.open(md[currentMaster].clubName,FILE_WRITE);
   dataFile.write((uint8_t *)&cb, sizeof(cb));
   dataFile.close();
 }
 /*void setCard(){
-  cb.club_name = "RnC";
+  cb.clubName = "RnC";
   cb.masterCard[0] = 0;
   cb.masterCard[1] = 0;
   cb.masterCard[2] = 0;
   cb.masterCard[3] = 0;
-  cb.card_count = 0; //Represents the actual card count at present (ie, the number of cards that are stored in RnC)
+  cb.cardCount = 0; //Represents the actual card count at present (ie, the number of cards that are stored in RnC)
 
   //Setting all UIDs to 0000H
-  for(int i=0;i<num_member;i++){
+  for(int i=0;i<numMember;i++){
     for(int j=0;j<4;j++){
-      cb.card_id[i][j] = 0;
+      cb.cardID[i][j] = 0;
     }
   }
 }*/
@@ -253,10 +261,10 @@ void write_to_card(){
 void addCard(){
   
   for(int j=0;j<4;j++){
-    cb.card_id[cb.card_count][j] = readCard[j];
+    cb.cardID[cb.cardCount][j] = readCard[j];
   }
   
-  cb.card_count++;
+  cb.cardCount++;
   write_to_card();
   
   Serial.println("Card Added");
@@ -281,7 +289,7 @@ void deleteCard(){
   while(!flag){
     for(int j=0;j<4;j++){
       flag1 = 1;
-      if(readCard[j] != cb.card_id[i][j]){
+      if(readCard[j] != cb.cardID[i][j]){
         flag1 = 0;
         i++;
         break;
@@ -290,17 +298,17 @@ void deleteCard(){
     flag = flag1;
   }
 
-  for(;i<cb.card_count-1;i++){
+  for(;i<cb.cardCount-1;i++){
     for(int j=0;j<4;j++){
-      cb.card_id[i][j] = cb.card_id[i+1][j];
+      cb.cardID[i][j] = cb.cardID[i+1][j];
     }
   }
   
   for(int j = 0 ;j<4;j++){
-    cb.card_id[cb.card_count-1][j] = 0;
+    cb.cardID[cb.cardCount-1][j] = 0;
   }
   
-  cb.card_count--;
+  cb.cardCount--;
   write_to_card();
   
   Serial.println("Card Deleted");
@@ -318,10 +326,10 @@ void deleteCard(){
 //This function checks if the card that has been scanned is a master card or not
 boolean isMasterCard(){
   int flag;
-  for(int k=0;k<num_club;k++){
+  for(int k=0;k<numClub;k++){
     flag = 0;
     for(int j=0;j<4;j++){
-      if(readCard[j] != md[k].master_uid[j]){
+      if(readCard[j] != md[k].masterUID[j]){
         break;
       }
       if(j==3){
@@ -343,15 +351,15 @@ boolean isMasterCard(){
 boolean isPresentMaster(){    //Called in master mode to check if a card belongs to the club of the current master;
 
   //Insert Code here to initiate communciation with SD card..
-  dataFile = SD.open(md[currentMaster].club_file,FILE_READ);
+  dataFile = SD.open(md[currentMaster].clubFile,FILE_READ);
   dataFile.read((uint8_t *)&cb,sizeof(cb));
   dataFile.close();
   
   int flag;
-  for(int i=0;i<cb.card_count;i++){
+  for(int i=0;i<cb.cardCount;i++){
     flag = 0;
     for(int j=0;j<4;j++){
-      if(readCard[j] != cb.card_id[i][j]){
+      if(readCard[j] != cb.cardID[i][j]){
         break;
       }
       if(j == 3){
@@ -369,18 +377,18 @@ boolean isPresentNormal(){    //Used to check if a card is present in the databa
 
   int flag;
   
-  for(int k=0;k<num_club;k++){
+  for(int k=0;k<numClub;k++){
     
-    dataFile = SD.open(md[k].club_file,FILE_READ);
+    dataFile = SD.open(md[k].clubFile,FILE_READ);
     dataFile.read((uint8_t *)&cb,sizeof(cb));
     dataFile.close();
 
-    for(int i=0;i<cb.card_count;i++){
+    for(int i=0;i<cb.cardCount;i++){
 
       flag = 0;
 
       for(int j=0;j<4;j++){
-        if(readCard[j] != cb.card_id[i][j]){
+        if(readCard[j] != cb.cardID[i][j]){
           break;
         }
         if(j == 3){
@@ -411,4 +419,8 @@ uint8_t getID() {
   }
   mfrc522.PICC_HaltA(); // Stop reading from RFID reader
   return 1;  
+}
+
+void nodeOn(){  //Function that is invoked when the nodeMCU is switched on, ie; When the node MCU is receiving data from the app
+  //Write code here to receive details from the node MCU (using rx and tx pins)
 }
